@@ -1,0 +1,46 @@
+name: Release Promotion Workflow
+
+on:
+  release:
+    types: [prereleased]
+
+jobs:
+  request_approval:
+    runs-on: ubuntu-latest
+    environment: 'production'  # Ambiente configurado com approvers
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Get release notes and assign reviewers
+        id: release_info
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const release = await github.rest.repos.getRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: context.payload.release.id
+            });
+            
+            // Identificar reviewers baseado no conteúdo das release notes
+            const releaseNotes = release.data.body;
+            const reviewers = ['tech-lead', 'qa-lead']; // Exemplo fixo, pode ser dinâmico
+            
+            return {
+              releaseId: release.data.id,
+              reviewers: reviewers
+            };
+
+      - name: Promote to production release
+        if: success()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            await github.rest.repos.updateRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: context.payload.release.id,
+              prerelease: false,
+              draft: false
+            });
