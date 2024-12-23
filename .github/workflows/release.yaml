@@ -30,7 +30,7 @@ jobs:
               release_id: context.payload.release.id
             });
             
-            // Usando apenas os revisores fixos para teste
+            // Using fixed reviewers for testing
             const reviewers = ['keren-cw', 'ingrid-cw'];
             core.setOutput('reviewers', JSON.stringify(reviewers));
             core.setOutput('release_id', release.data.id);
@@ -51,7 +51,7 @@ jobs:
               description: `Release deployment for ${context.payload.release.tag_name}`
             });
             
-            // Criar status do deployment como "waiting"
+            // Set deployment status to waiting
             await github.rest.repos.createDeploymentStatus({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -60,7 +60,7 @@ jobs:
               description: 'Waiting for approval'
             });
             
-            // Criar issue para aprovação
+            // Create approval issue
             const reviewers = JSON.parse(process.env.REVIEWERS);
             const issue = await github.rest.issues.create({
               owner: context.repo.owner,
@@ -76,7 +76,7 @@ jobs:
               labels: ['needs-approval']
             });
             
-            // Adicionar os revisores à issue
+            // Assign reviewers to the issue
             await github.rest.issues.addAssignees({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -89,34 +89,55 @@ jobs:
         env:
           REVIEWERS: ${{ steps.release_info.outputs.reviewers }}
 
-  promote_release:
-    needs: request_approval
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Check approvals
+      - name: Wait for approvals
+        id: wait_approvals
         uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const issue_number = ${{ needs.request_approval.outputs.issue_number }};
-            const reactions = await github.rest.reactions.listForIssue({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: issue_number
-            });
-            
+            const issue_number = ${{ steps.create_deployment.outputs.issue_number }};
             const reviewers = ['keren-cw', 'ingrid-cw'];
-            const approvals = reactions.data
-              .filter(reaction => reaction.content === '+1')
-              .filter(reaction => reviewers.includes(reaction.user.login));
+            const maxAttempts = 720; // 6 hours (30 seconds * 720)
+            let attempts = 0;
             
-            if (approvals.length < reviewers.length) {
-              core.setFailed('Not all required reviewers have approved');
-              return;
+            while (attempts < maxAttempts) {
+              console.log(`Checking approvals (attempt ${attempts + 1}/${maxAttempts})...`);
+              
+              const reactions = await github.rest.reactions.listForIssue({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue_number
+              });
+              
+              const approvals = reactions.data
+                .filter(reaction => reaction.content === '+1')
+                .filter(reaction => reviewers.includes(reaction.user.login));
+              
+              if (approvals.length >= reviewers.length) {
+                console.log('All approvals received!');
+                return;
+              }
+              
+              console.log(`Current approvals: ${approvals.length}/${reviewers.length}`);
+              if (attempts < maxAttempts - 1) {
+                await new Promise(resolve => setTimeout(resolve, 30000)); // Wait 30 seconds
+              }
+              attempts++;
             }
             
-            // Update deployment status to success
+            core.setFailed('Timeout waiting for approvals');
+
+  promote_release:
+    needs: request_approval
+    runs-on: ubuntu-latest
+    if: success()
+    
+    steps:
+      - name: Update deployment status
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
             await github.rest.repos.createDeploymentStatus({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -126,7 +147,6 @@ jobs:
             });
 
       - name: Promote to production release
-        if: success()
         uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
