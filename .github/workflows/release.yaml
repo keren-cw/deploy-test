@@ -4,10 +4,16 @@ on:
   release:
     types: [prereleased]
 
+# Add permissions block at workflow level
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
 jobs:
   request_approval:
     runs-on: ubuntu-latest
-    environment: 'production'  # Ambiente configurado com approvers
+    environment: 'production'  # Environment configured with approvers
     
     steps:
       - uses: actions/checkout@v3
@@ -16,6 +22,8 @@ jobs:
         id: release_info
         uses: actions/github-script@v6
         with:
+          # Explicitly set token permissions
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const release = await github.rest.repos.getRelease({
               owner: context.repo.owner,
@@ -23,9 +31,9 @@ jobs:
               release_id: context.payload.release.id
             });
             
-            // Identificar reviewers baseado no conteúdo das release notes
+            // Identify reviewers based on release notes content
             const releaseNotes = release.data.body;
-            const reviewers = ['tech-lead', 'qa-lead']; // Exemplo fixo, pode ser dinâmico
+            const reviewers = ['keren-cw', 'ingrid-cw']; // Fixed example, can be dynamic
             
             return {
               releaseId: release.data.id,
@@ -36,6 +44,8 @@ jobs:
         if: success()
         uses: actions/github-script@v6
         with:
+          # Explicitly set token permissions
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             await github.rest.repos.updateRelease({
               owner: context.repo.owner,
