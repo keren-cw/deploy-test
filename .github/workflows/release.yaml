@@ -15,6 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       deployment_id: ${{ steps.create_deployment.outputs.deployment_id }}
+      issue_number: ${{ steps.create_deployment.outputs.issue_number }}
     
     steps:
       - name: Get release info and reviewers
@@ -59,22 +60,32 @@ jobs:
               description: 'Waiting for approval'
             });
             
-            // Solicitar revisões para cada revisor
+            // Criar issue para aprovação
             const reviewers = JSON.parse(process.env.REVIEWERS);
-            for (const reviewer of reviewers) {
-              await github.rest.repos.createDeploymentProtectionRule({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                environment_name: 'production',
-                deployment_id: deployment.data.id,
-                reviewers: [{
-                  type: 'User',
-                  reviewer: reviewer
-                }]
-              });
-            }
+            const issue = await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Approval needed: Release ${context.payload.release.tag_name}`,
+              body: `Release ${context.payload.release.tag_name} needs approval to be promoted to production.
+              
+              Please review and approve by adding a :+1: reaction to this issue.
+              
+              Reviewers: ${reviewers.map(r => '@' + r).join(', ')}
+              
+              Deployment ID: ${deployment.data.id}`,
+              labels: ['needs-approval']
+            });
+            
+            // Adicionar os revisores à issue
+            await github.rest.issues.addAssignees({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.data.number,
+              assignees: reviewers
+            });
             
             core.setOutput('deployment_id', deployment.data.id);
+            core.setOutput('issue_number', issue.data.number);
         env:
           REVIEWERS: ${{ steps.release_info.outputs.reviewers }}
 
@@ -83,22 +94,36 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-      - name: Check deployment status
+      - name: Check approvals
         uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const deployment_id = ${{ needs.request_approval.outputs.deployment_id }};
-            const statuses = await github.rest.repos.listDeploymentStatuses({
+            const issue_number = ${{ needs.request_approval.outputs.issue_number }};
+            const reactions = await github.rest.reactions.listForIssue({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              deployment_id: deployment_id
+              issue_number: issue_number
             });
             
-            const approved = statuses.data.some(status => status.state === 'success');
-            if (!approved) {
-              core.setFailed('Deployment has not been approved');
+            const reviewers = ['keren-cw', 'ingrid-cw'];
+            const approvals = reactions.data
+              .filter(reaction => reaction.content === '+1')
+              .filter(reaction => reviewers.includes(reaction.user.login));
+            
+            if (approvals.length < reviewers.length) {
+              core.setFailed('Not all required reviewers have approved');
+              return;
             }
+            
+            // Update deployment status to success
+            await github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: ${{ needs.request_approval.outputs.deployment_id }},
+              state: 'success',
+              description: 'Deployment approved'
+            });
 
       - name: Promote to production release
         if: success()
@@ -112,4 +137,12 @@ jobs:
               release_id: context.payload.release.id,
               prerelease: false,
               draft: false
+            });
+            
+            // Close the approval issue
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: ${{ needs.request_approval.outputs.issue_number }},
+              state: 'closed'
             });
