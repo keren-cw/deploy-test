@@ -4,25 +4,23 @@ on:
   release:
     types: [prereleased]
 
-# Add permissions block at workflow level
 permissions:
   contents: write
   pull-requests: write
   issues: write
+  deployments: write
 
 jobs:
   request_approval:
     runs-on: ubuntu-latest
-    environment: 'production'  # Environment configured with approvers
+    outputs:
+      deployment_id: ${{ steps.create_deployment.outputs.deployment_id }}
     
     steps:
-      - uses: actions/checkout@v3
-      
-      - name: Get release notes and assign reviewers
+      - name: Get release info and reviewers
         id: release_info
         uses: actions/github-script@v6
         with:
-          # Explicitly set token permissions
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const release = await github.rest.repos.getRelease({
@@ -31,20 +29,81 @@ jobs:
               release_id: context.payload.release.id
             });
             
-            // Identify reviewers based on release notes content
-            const releaseNotes = release.data.body;
-            const reviewers = ['keren-cw', 'ingrid-cw']; // Fixed example, can be dynamic
+            // Usando apenas os revisores fixos para teste
+            const reviewers = ['keren-cw', 'ingrid-cw'];
+            core.setOutput('reviewers', JSON.stringify(reviewers));
+            core.setOutput('release_id', release.data.id);
+
+      - name: Create deployment
+        id: create_deployment
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const deployment = await github.rest.repos.createDeployment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: context.payload.release.tag_name,
+              environment: 'production',
+              auto_merge: false,
+              required_contexts: [],
+              description: `Release deployment for ${context.payload.release.tag_name}`
+            });
             
-            return {
-              releaseId: release.data.id,
-              reviewers: reviewers
-            };
+            // Criar status do deployment como "waiting"
+            await github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: deployment.data.id,
+              state: 'pending',
+              description: 'Waiting for approval'
+            });
+            
+            // Solicitar revisões para cada revisor
+            const reviewers = JSON.parse(process.env.REVIEWERS);
+            for (const reviewer of reviewers) {
+              await github.rest.repos.createDeploymentProtectionRule({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                environment_name: 'production',
+                deployment_id: deployment.data.id,
+                reviewers: [{
+                  type: 'User',
+                  reviewer: reviewer
+                }]
+              });
+            }
+            
+            core.setOutput('deployment_id', deployment.data.id);
+        env:
+          REVIEWERS: ${{ steps.release_info.outputs.reviewers }}
+
+  promote_release:
+    needs: request_approval
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Check deployment status
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const deployment_id = ${{ needs.request_approval.outputs.deployment_id }};
+            const statuses = await github.rest.repos.listDeploymentStatuses({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: deployment_id
+            });
+            
+            const approved = statuses.data.some(status => status.state === 'success');
+            if (!approved) {
+              core.setFailed('Deployment has not been approved');
+            }
 
       - name: Promote to production release
         if: success()
         uses: actions/github-script@v6
         with:
-          # Explicitly set token permissions
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             await github.rest.repos.updateRelease({
