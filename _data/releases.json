@@ -38,7 +38,10 @@
       "title": "Release v1.0.38",
       "tag": "v1.0.38",
       "release_date": "2024-12-27T18:26:50Z",
-      "notes": "Testing release history with JSON only"
+      "notes": "Testing release history with JSON only",
+      "approval_date": "2024-12-27T18:29:15Z",
+      "approvers": "release-approval-app[bot]",
+      "approval_time_minutes": 2
     }
   ]
 }
