@@ -1,6 +1,7 @@
-title: Release History
-description: History of all approved releases with approval times
+title: Release History Dashboard
+description: Track and analyze release approvals and deployment metrics
 theme: jekyll-theme-minimal
+baseurl: /deploy-test
 
 # Release files configuration
 include:
@@ -8,6 +9,11 @@ include:
 
 # Default layout for release files
 defaults:
+  - scope:
+      path: ""
+      type: "pages"
+    values:
+      layout: "default"
   - scope:
       path: "releases"
       type: "pages"
