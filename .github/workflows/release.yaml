@@ -7,18 +7,18 @@ on:
 permissions:
   contents: write
   pull-requests: write
-  issues: write
-  deployments: write
 
 jobs:
-  request_approval:
+  create_approval_pr:
     runs-on: ubuntu-latest
     outputs:
-      deployment_id: ${{ steps.create_deployment.outputs.deployment_id }}
-      issue_number: ${{ steps.create_deployment.outputs.issue_number }}
+      pr_number: ${{ steps.create_pr.outputs.pr_number }}
     
     steps:
-      - name: Get release info and reviewers
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Get release info
         id: release_info
         uses: actions/github-script@v6
         with:
@@ -30,121 +30,87 @@ jobs:
               release_id: context.payload.release.id
             });
             
-            // Using fixed reviewers for testing
-            const reviewers = ['keren-cw', 'ingrid-cw'];
-            core.setOutput('reviewers', JSON.stringify(reviewers));
-            core.setOutput('release_id', release.data.id);
+            core.setOutput('tag_name', release.data.tag_name);
+            core.setOutput('release_name', release.data.name || release.data.tag_name);
+            core.setOutput('created_at', release.data.created_at);
+            core.setOutput('body', release.data.body || '');
 
-      - name: Create deployment
-        id: create_deployment
+      - name: Create release approval branch
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git checkout -b release-approval-${{ steps.release_info.outputs.tag_name }}
+
+      - name: Create release details file
+        run: |
+          mkdir -p releases
+          cat > releases/${{ steps.release_info.outputs.tag_name }}.md << EOL
+          # Release Approval: ${{ steps.release_info.outputs.release_name }}
+          
+          - **Tag**: ${{ steps.release_info.outputs.tag_name }}
+          - **Release Date**: ${{ steps.release_info.outputs.created_at }}
+          
+          ## Release Notes
+          ${{ steps.release_info.outputs.body }}
+          EOL
+          
+          git add releases/${{ steps.release_info.outputs.tag_name }}.md
+          git commit -m "docs: add release details for ${{ steps.release_info.outputs.tag_name }}"
+          git push origin release-approval-${{ steps.release_info.outputs.tag_name }}
+
+      - name: Create Pull Request
+        id: create_pr
         uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const deployment = await github.rest.repos.createDeployment({
+            const pr = await github.rest.pulls.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              ref: context.payload.release.tag_name,
-              environment: 'production',
-              auto_merge: false,
-              required_contexts: [],
-              description: `Release deployment for ${context.payload.release.tag_name}`
-            });
-            
-            // Set deployment status to waiting
-            await github.rest.repos.createDeploymentStatus({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              deployment_id: deployment.data.id,
-              state: 'pending',
-              description: 'Waiting for approval'
-            });
-            
-            // Create approval issue
-            const reviewers = JSON.parse(process.env.REVIEWERS);
-            const issue = await github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: `Approval needed: Release ${context.payload.release.tag_name}`,
-              body: `Release ${context.payload.release.tag_name} needs approval to be promoted to production.
+              title: `Release Approval: ${process.env.RELEASE_NAME}`,
+              body: `This PR contains the release details for ${process.env.TAG_NAME}.
               
-              Please review and approve by adding a :+1: reaction to this issue.
-              
-              Reviewers: ${reviewers.map(r => '@' + r).join(', ')}
-              
-              Deployment ID: ${deployment.data.id}`,
-              labels: ['needs-approval']
+              Please review and approve. The release will be promoted once the PR is merged.`,
+              head: `release-approval-${process.env.TAG_NAME}`,
+              base: 'main'
             });
             
-            // Assign reviewers to the issue
-            await github.rest.issues.addAssignees({
+            // Add reviewers
+            await github.rest.pulls.requestReviewers({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              issue_number: issue.data.number,
-              assignees: reviewers
+              pull_number: pr.data.number,
+              reviewers: ['keren-cw', 'ingrid-cw']
             });
             
-            core.setOutput('deployment_id', deployment.data.id);
-            core.setOutput('issue_number', issue.data.number);
+            core.setOutput('pr_number', pr.data.number);
         env:
-          REVIEWERS: ${{ steps.release_info.outputs.reviewers }}
-
-      - name: Wait for approvals
-        id: wait_approvals
-        uses: actions/github-script@v6
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const issue_number = ${{ steps.create_deployment.outputs.issue_number }};
-            const reviewers = ['keren-cw', 'ingrid-cw'];
-            const maxAttempts = 720; // 6 hours (30 seconds * 720)
-            let attempts = 0;
-            
-            while (attempts < maxAttempts) {
-              console.log(`Checking approvals (attempt ${attempts + 1}/${maxAttempts})...`);
-              
-              const reactions = await github.rest.reactions.listForIssue({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: issue_number
-              });
-              
-              const approvals = reactions.data
-                .filter(reaction => reaction.content === '+1')
-                .filter(reaction => reviewers.includes(reaction.user.login));
-              
-              if (approvals.length >= reviewers.length) {
-                console.log('All approvals received!');
-                return;
-              }
-              
-              console.log(`Current approvals: ${approvals.length}/${reviewers.length}`);
-              if (attempts < maxAttempts - 1) {
-                await new Promise(resolve => setTimeout(resolve, 30000)); // Wait 30 seconds
-              }
-              attempts++;
-            }
-            
-            core.setFailed('Timeout waiting for approvals');
+          TAG_NAME: ${{ steps.release_info.outputs.tag_name }}
+          RELEASE_NAME: ${{ steps.release_info.outputs.release_name }}
 
   promote_release:
-    needs: request_approval
+    needs: create_approval_pr
     runs-on: ubuntu-latest
-    if: success()
     
     steps:
-      - name: Update deployment status
+      - name: Check PR status
         uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            await github.rest.repos.createDeploymentStatus({
+            const pr_number = ${{ needs.create_approval_pr.outputs.pr_number }};
+            
+            // Check if PR is merged
+            const pr = await github.rest.pulls.get({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              deployment_id: ${{ needs.request_approval.outputs.deployment_id }},
-              state: 'success',
-              description: 'Deployment approved'
+              pull_number: pr_number
             });
+            
+            if (!pr.data.merged) {
+              core.setFailed('Pull request must be approved and merged before release promotion');
+              return;
+            }
 
       - name: Promote to production release
         uses: actions/github-script@v6
@@ -157,12 +123,4 @@ jobs:
               release_id: context.payload.release.id,
               prerelease: false,
               draft: false
-            });
-            
-            // Close the approval issue
-            await github.rest.issues.update({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: ${{ needs.request_approval.outputs.issue_number }},
-              state: 'closed'
             });
