@@ -1,10 +1,11 @@
-name: Release Promotion Workflow
+name: Release Approval
 
 on:
   release:
-    types: [prereleased]
-  pull_request:
-    types: [closed]
+    types: [published]
+  pull_request_review:
+    types: [submitted]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -13,265 +14,125 @@ permissions:
   id-token: write
 
 jobs:
-  create_approval_pr:
+  create-approval-pr:
     if: github.event_name == 'release'
     runs-on: ubuntu-latest
-    
     steps:
-      - name: Generate App token
-        id: generate_token
-        uses: tibdex/github-app-token@v2
-        with:
-          app_id: ${{ secrets.APP_ID }}
-          private_key: ${{ secrets.APP_PRIVATE_KEY }}
-
-      - name: Checkout code
-        uses: actions/checkout@v3
-        with:
-          token: ${{ steps.generate_token.outputs.token }}
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '18'
-
-      - name: Install dependencies
-        run: npm install
-
-      - name: Get release info
-        id: release_info
-        uses: actions/github-script@v6
-        with:
-          github-token: ${{ steps.generate_token.outputs.token }}
-          script: |
-            const release = await github.rest.repos.getRelease({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              release_id: context.payload.release.id
-            });
-            
-            core.setOutput('tag_name', release.data.tag_name);
-            core.setOutput('release_name', release.data.name || release.data.tag_name);
-            core.setOutput('created_at', release.data.created_at);
-            core.setOutput('body', release.data.body || '');
-
-      - name: Setup git config
-        id: git_config
-        uses: actions/github-script@v6
-        with:
-          script: |
-            const config = require('./.github/scripts/config.js');
-            const gitConfig = config.getGitConfig();
-            core.setOutput('user_name', gitConfig.name);
-            core.setOutput('user_email', gitConfig.email);
-
-      - name: Create release approval branch
+      - uses: actions/checkout@v4
+      
+      - name: Get release details
+        id: release
         run: |
-          git config --global user.name "${{ steps.git_config.outputs.user_name }}"
-          git config --global user.email "${{ steps.git_config.outputs.user_email }}"
-          git checkout -b release-approval-${{ steps.release_info.outputs.tag_name }}
-
-      - name: Create release details file
-        uses: actions/github-script@v6
-        with:
-          github-token: ${{ steps.generate_token.outputs.token }}
-          script: |
-            const fs = require('fs');
-            const config = require('./.github/scripts/config.js');
-            const gitConfig = config.getGitConfig();
-            
-            const content = `---
-            layout: default
-            title: "Release Approval: ${process.env.RELEASE_NAME}"
-            tag: "${process.env.TAG_NAME}"
-            release_date: "${process.env.CREATED_AT}"
-            ---
-
-            # Release Approval: ${process.env.RELEASE_NAME}
-            
-            - **Tag**: ${process.env.TAG_NAME}
-            - **Release Date**: ${process.env.CREATED_AT}
-            
-            ## Release Notes
-            ${process.env.BODY}`;
-            
-            const dir = 'releases';
-            if (!fs.existsSync(dir)) {
-              fs.mkdirSync(dir);
-            }
-            
-            const filePath = `${dir}/${process.env.TAG_NAME}.md`;
-            fs.writeFileSync(filePath, content);
-            
-            await exec.exec('git', ['config', '--global', 'user.name', gitConfig.name]);
-            await exec.exec('git', ['config', '--global', 'user.email', gitConfig.email]);
-            await exec.exec('git', ['add', filePath]);
-            await exec.exec('git', ['commit', '-m', config.getCommitMessage('add_release', process.env.TAG_NAME)]);
-            await exec.exec('git', ['push', 'origin', `release-approval-${process.env.TAG_NAME}`]);
-        env:
-          TAG_NAME: ${{ steps.release_info.outputs.tag_name }}
-          RELEASE_NAME: ${{ steps.release_info.outputs.release_name }}
-          CREATED_AT: ${{ steps.release_info.outputs.created_at }}
-          BODY: ${{ steps.release_info.outputs.body }}
-
+          echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          echo "date=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
+          
+      - name: Create release branch
+        run: |
+          git config --global user.name "Release Approval App"
+          git config --global user.email "release-approval[bot]@users.noreply.github.com"
+          git checkout -b release-approval-${{ steps.release.outputs.tag }}
+          
+      - name: Update releases.json
+        run: |
+          if [ ! -f releases.json ]; then
+            echo '{"releases":[]}' > releases.json
+          fi
+          
+          jq --arg tag "${{ steps.release.outputs.tag }}" \
+             --arg date "${{ steps.release.outputs.date }}" \
+             --arg title "Release ${{ steps.release.outputs.tag }}" \
+             --arg notes "${{ github.event.release.body }}" \
+             '.releases += [{
+               "title": $title,
+               "tag": $tag,
+               "release_date": $date,
+               "notes": $notes
+             }]' releases.json > temp.json && mv temp.json releases.json
+          
       - name: Create Pull Request
-        id: create_pr
-        uses: actions/github-script@v6
-        with:
-          github-token: ${{ steps.generate_token.outputs.token }}
-          script: |
-            const config = require('./.github/scripts/config.js');
-            
-            const pr = await github.rest.pulls.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: `Release Approval: ${process.env.RELEASE_NAME}`,
-              body: `This PR contains the release details for ${process.env.TAG_NAME}.
-              
-              Please review and approve. The release will be promoted once the PR is merged.`,
-              head: `release-approval-${process.env.TAG_NAME}`,
-              base: 'main'
-            });
-            
-            // Add reviewers from config
-            await github.rest.pulls.requestReviewers({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: pr.data.number,
-              reviewers: config.getReviewers()
-            });
         env:
-          TAG_NAME: ${{ steps.release_info.outputs.tag_name }}
-          RELEASE_NAME: ${{ steps.release_info.outputs.release_name }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git add releases.json
+          git commit -m "Release Approval: ${{ steps.release.outputs.tag }}"
+          git push -u origin release-approval-${{ steps.release.outputs.tag }}
+          
+          gh pr create \
+            --title "Release Approval: ${{ steps.release.outputs.tag }}" \
+            --body "This PR was automatically created to track the approval of release ${{ steps.release.outputs.tag }}." \
+            --base main \
+            --head release-approval-${{ steps.release.outputs.tag }}
 
-  promote_release:
-    if: |
-      github.event_name == 'pull_request' &&
-      github.event.action == 'closed' &&
-      github.event.pull_request.merged == true &&
-      startsWith(github.event.pull_request.head.ref, 'release-approval-')
+  update-release-status:
+    if: github.event_name == 'pull_request_review' && github.event.review.state == 'approved' && startsWith(github.event.pull_request.head.ref, 'release-approval-')
     runs-on: ubuntu-latest
-    
     steps:
-      - name: Generate App token
-        id: generate_token
-        uses: tibdex/github-app-token@v2
+      - uses: actions/checkout@v4
         with:
-          app_id: ${{ secrets.APP_ID }}
-          private_key: ${{ secrets.APP_PRIVATE_KEY }}
+          ref: ${{ github.event.pull_request.head.ref }}
+          
+      - name: Get release tag
+        id: release
+        run: |
+          TAG=${GITHUB_HEAD_REF#release-approval-}
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "approval_date=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
+          
+      - name: Update releases.json
+        run: |
+          jq --arg tag "${{ steps.release.outputs.tag }}" \
+             --arg date "${{ steps.release.outputs.approval_date }}" \
+             --arg approver "${{ github.event.review.user.login }}" \
+             --argjson minutes "$(( ($(date -u +%s) - $(date -u -d "${{ github.event.pull_request.created_at }}" +%s)) / 60 ))" \
+             '.releases |= map(
+               if .tag == $tag then
+                 . + {
+                   "approval_date": $date,
+                   "approvers": $approver,
+                   "approval_time_minutes": $minutes
+                 }
+               else . end
+             )' releases.json > temp.json && mv temp.json releases.json
+          
+      - name: Commit and push changes
+        run: |
+          git config --global user.name "Release Approval App"
+          git config --global user.email "release-approval[bot]@users.noreply.github.com"
+          git add releases.json
+          git commit -m "Update release status: ${{ steps.release.outputs.tag }}"
+          git push
+          
+      - name: Auto-merge PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh pr merge ${{ github.event.pull_request.number }} --merge --delete-branch
 
-      - name: Checkout code
-        uses: actions/checkout@v3
-        with:
-          token: ${{ steps.generate_token.outputs.token }}
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '18'
-
-      - name: Install dependencies
-        run: npm install
-
-      - name: Get release from tag and reviews
-        id: get_release
-        uses: actions/github-script@v6
-        with:
-          github-token: ${{ steps.generate_token.outputs.token }}
-          script: |
-            const tagName = context.payload.pull_request.head.ref.replace('release-approval-', '');
-            
-            // Get all releases
-            const releases = await github.rest.repos.listReleases({
-              owner: context.repo.owner,
-              repo: context.repo.repo
-            });
-            
-            const release = releases.data.find(r => r.tag_name === tagName && r.prerelease);
-            
-            if (!release) {
-              core.setFailed(`No pre-release found for tag ${tagName}`);
-              return;
-            }
-            
-            // Get PR reviews
-            const reviews = await github.rest.pulls.listReviews({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: context.payload.pull_request.number
-            });
-            
-            // Get unique approvers
-            const approvers = [...new Set(
-              reviews.data
-                .filter(review => review.state === 'APPROVED')
-                .map(review => review.user.login)
-            )];
-            
-            core.setOutput('release_id', release.id);
-            core.setOutput('tag_name', tagName);
-            core.setOutput('approvers', approvers.join(', '));
-
-      - name: Update release details file
-        uses: actions/github-script@v6
-        with:
-          github-token: ${{ steps.generate_token.outputs.token }}
-          script: |
-            const script = require('./.github/scripts/generate-release-content.js');
-            await script({ github, context, core });
-
-      - name: Promote to production release
-        if: success()
-        uses: actions/github-script@v6
-        with:
-          github-token: ${{ steps.generate_token.outputs.token }}
-          script: |
-            await github.rest.repos.updateRelease({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              release_id: ${{ steps.get_release.outputs.release_id }},
-              prerelease: false,
-              draft: false
-            });
-
-  deploy_pages:
-    needs: promote_release
-    if: |
-      success() &&
-      github.ref == 'refs/heads/main'
+  pages:
+    needs: [update-release-status]
+    if: github.event_name == 'pull_request_review' && github.event.review.state == 'approved'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-    permissions:
-      pages: write
-      id-token: write
-    
     steps:
-      - name: Generate App token
-        id: generate_token
-        uses: tibdex/github-app-token@v2
-        with:
-          app_id: ${{ secrets.APP_ID }}
-          private_key: ${{ secrets.APP_PRIVATE_KEY }}
-
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
-          token: ${{ steps.generate_token.outputs.token }}
-
+          ref: main
+      
       - name: Setup Pages
         uses: actions/configure-pages@v4
-
+      
       - name: Build with Jekyll
         uses: actions/jekyll-build-pages@v1
         with:
           source: ./
           destination: ./_site
-
+      
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v2
-
+        uses: actions/upload-pages-artifact@v3
+      
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v3
+        uses: actions/deploy-pages@v4

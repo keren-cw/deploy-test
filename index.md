@@ -5,7 +5,8 @@ title: Release History Dashboard
 
 {% assign repository_name = site.github.repository_name %}
 {% assign repository_owner = site.github.owner_name %}
-{% assign sorted_releases = site.pages | where_exp: "item", "item.path contains 'releases/'" | sort: "release_date" | reverse %}
+{% assign releases_json = site.data.releases %}
+{% assign sorted_releases = releases_json.releases | sort: "release_date" | reverse %}
 
 # Release History Dashboard
 
