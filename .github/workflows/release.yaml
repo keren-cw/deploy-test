@@ -3,16 +3,17 @@ name: Release Promotion Workflow
 on:
   release:
     types: [prereleased]
+  pull_request:
+    types: [closed]
 
 permissions:
-  contents: read
-  pull-requests: read
+  contents: write
+  pull-requests: write
 
 jobs:
   create_approval_pr:
+    if: github.event_name == 'release'
     runs-on: ubuntu-latest
-    outputs:
-      pr_number: ${{ steps.create_pr.outputs.pr_number }}
     
     steps:
       - name: Generate App token
@@ -91,14 +92,16 @@ jobs:
               pull_number: pr.data.number,
               reviewers: ['keren-cw', 'ingrid-cw']
             });
-            
-            core.setOutput('pr_number', pr.data.number);
         env:
           TAG_NAME: ${{ steps.release_info.outputs.tag_name }}
           RELEASE_NAME: ${{ steps.release_info.outputs.release_name }}
 
   promote_release:
-    needs: create_approval_pr
+    if: |
+      github.event_name == 'pull_request' &&
+      github.event.action == 'closed' &&
+      github.event.pull_request.merged == true &&
+      startsWith(github.event.pull_request.head.ref, 'release-approval-')
     runs-on: ubuntu-latest
     
     steps:
@@ -109,26 +112,31 @@ jobs:
           app_id: ${{ secrets.APP_ID }}
           private_key: ${{ secrets.APP_PRIVATE_KEY }}
 
-      - name: Check PR status
+      - name: Get release from tag
+        id: get_release
         uses: actions/github-script@v6
         with:
           github-token: ${{ steps.generate_token.outputs.token }}
           script: |
-            const pr_number = ${{ needs.create_approval_pr.outputs.pr_number }};
+            const tagName = context.payload.pull_request.head.ref.replace('release-approval-', '');
             
-            // Check if PR is merged
-            const pr = await github.rest.pulls.get({
+            // Get all releases
+            const releases = await github.rest.repos.listReleases({
               owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: pr_number
+              repo: context.repo.repo
             });
             
-            if (!pr.data.merged) {
-              core.setFailed('Pull request must be approved and merged before release promotion');
+            const release = releases.data.find(r => r.tag_name === tagName && r.prerelease);
+            
+            if (!release) {
+              core.setFailed(`No pre-release found for tag ${tagName}`);
               return;
             }
+            
+            core.setOutput('release_id', release.id);
 
       - name: Promote to production release
+        if: success()
         uses: actions/github-script@v6
         with:
           github-token: ${{ steps.generate_token.outputs.token }}
@@ -136,7 +144,7 @@ jobs:
             await github.rest.repos.updateRelease({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              release_id: context.payload.release.id,
+              release_id: ${{ steps.get_release.outputs.release_id }},
               prerelease: false,
               draft: false
             });
