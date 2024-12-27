@@ -55,6 +55,9 @@ jobs:
 
       - name: Create release details file
         run: |
+          git config --global user.name "Release Approval App"
+          git config --global user.email "release-approval[bot]@users.noreply.github.com"
+          
           mkdir -p releases
           cat > releases/${{ steps.release_info.outputs.tag_name }}.md << EOL
           ---
@@ -74,7 +77,7 @@ jobs:
           EOL
           
           git add releases/${{ steps.release_info.outputs.tag_name }}.md
-          git commit -m "docs: add release details for ${{ steps.release_info.outputs.tag_name }}"
+          git -c user.name="Release Approval App" -c user.email="release-approval[bot]@users.noreply.github.com" commit -m "docs: add release details for ${{ steps.release_info.outputs.tag_name }}"
           git push origin release-approval-${{ steps.release_info.outputs.tag_name }}
 
       - name: Create Pull Request
