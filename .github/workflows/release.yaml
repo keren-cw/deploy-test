@@ -170,8 +170,12 @@ jobs:
           git config --global user.name "Release Approval App[bot]"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
           
+          # Get release info
+          release_tag="${{ steps.get_release.outputs.tag_name }}"
+          release_file="releases/$release_tag.md"
+          
           # Get current content after front matter
-          content=$(awk '/^---/{n++;next} n==2{p=NR+1;exit} {print}' releases/${{ steps.get_release.outputs.tag_name }}.md)
+          content=$(awk '/^---/{n++;next} n==2{p=NR+1;exit} {print}' "$release_file")
           
           # Find the line with Release Date
           release_date_line=$(echo "$content" | grep "Release Date")
@@ -179,21 +183,19 @@ jobs:
           # Create new content with Approval Date and Approvers after Release Date
           new_content=$(echo "$content" | sed "s|$release_date_line|$release_date_line\n- **Approval Date**: ${{ github.event.pull_request.merged_at }}\n- **Approved By**: ${{ steps.get_release.outputs.approvers }}|")
           
-          # Add front matter back
-          cat > releases/${{ steps.get_release.outputs.tag_name }}.md << EOL
-          ---
-          layout: default
-          title: "Release Approval: ${{ steps.release_info.outputs.release_name }}"
-          tag: "${{ steps.release_info.outputs.tag_name }}"
-          release_date: "${{ steps.release_info.outputs.created_at }}"
-          approval_date: "${{ github.event.pull_request.merged_at }}"
-          approvers: "${{ steps.get_release.outputs.approvers }}"
-          ---
-
-          $new_content
-          EOL
+          # Create the updated file content
+          echo "---" > "$release_file"
+          echo "layout: default" >> "$release_file"
+          echo "title: \"Release Approval: ${{ steps.get_release.outputs.tag_name }}\"" >> "$release_file"
+          echo "tag: \"${{ steps.get_release.outputs.tag_name }}\"" >> "$release_file"
+          echo "release_date: \"${{ steps.get_release.outputs.created_at }}\"" >> "$release_file"
+          echo "approval_date: \"${{ github.event.pull_request.merged_at }}\"" >> "$release_file"
+          echo "approvers: \"${{ steps.get_release.outputs.approvers }}\"" >> "$release_file"
+          echo "---" >> "$release_file"
+          echo "" >> "$release_file"
+          echo "$new_content" >> "$release_file"
           
-          git add releases/${{ steps.get_release.outputs.tag_name }}.md
+          git add "$release_file"
           git commit -m "docs: update release details with approval date and approvers"
           git push origin main
 
@@ -218,10 +220,22 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      pages: write
+      id-token: write
     
     steps:
+      - name: Generate App token
+        id: generate_token
+        uses: tibdex/github-app-token@v2
+        with:
+          app_id: ${{ secrets.APP_ID }}
+          private_key: ${{ secrets.APP_PRIVATE_KEY }}
+
       - name: Checkout
         uses: actions/checkout@v3
+        with:
+          token: ${{ steps.generate_token.outputs.token }}
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
