@@ -83,7 +83,10 @@
       "title": "Release v1.0.46",
       "tag": "v1.0.46",
       "release_date": "2024-12-27T18:38:26Z",
-      "notes": "Testing BRT timestamps and hour metrics"
+      "notes": "Testing BRT timestamps and hour metrics",
+      "approval_date": "2024-12-27T18:39:50Z",
+      "approvers": "qe-release-approval[bot]",
+      "approval_time_minutes": 1
     }
   ]
 }
