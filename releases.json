@@ -15,6 +15,12 @@
       "tag": "v1.0.35",
       "release_date": "2024-12-27T15:48:01Z",
       "notes": "Testing with GitHub App token restored"
+    },
+    {
+      "title": "Release v1.0.36",
+      "tag": "v1.0.36",
+      "release_date": "2024-12-27T16:20:49Z",
+      "notes": "Testing with reorganized asset structure"
     }
   ]
 }
