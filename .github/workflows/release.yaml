@@ -47,8 +47,7 @@ jobs:
 
       - name: Create release approval branch
         run: |
-          git config --global user.name "Release Approval Bot[bot]"
-          git config --global user.email "release-approval-bot[bot]@users.noreply.github.com"
+          git config --global user.name "Release Approval App[bot]"
           git checkout -b release-approval-${{ steps.release_info.outputs.tag_name }}
 
       - name: Create release details file
@@ -143,8 +142,7 @@ jobs:
 
       - name: Update release details file
         run: |
-          git config --global user.name "Release Approval Bot[bot]"
-          git config --global user.email "release-approval-bot[bot]@users.noreply.github.com"
+          git config --global user.name "Release Approval App[bot]"
           
           # Add merge timestamp to the file
           echo -e "\n## Approval Details\n- **Merged At**: ${{ github.event.pull_request.merged_at }}" >> releases/${{ steps.get_release.outputs.tag_name }}.md
