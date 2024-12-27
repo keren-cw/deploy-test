@@ -104,13 +104,9 @@ title: Release History Dashboard
     <div class="release-meta">
       <p><strong>Tag:</strong> {{ release.tag }}</p>
       <p><strong>Released:</strong> {{ release.release_date | date: "%Y-%m-%d %H:%M" }}</p>
-      {% if release.approval_date %}
       <p><strong>Approved:</strong> {{ release.approval_date | date: "%Y-%m-%d %H:%M" }}</p>
       <p><strong>Approvers:</strong> {{ release.approvers }}</p>
       <p><strong>Approval Time:</strong> {{ release.approval_time_minutes }} minutes</p>
-      {% else %}
-      <p class="pending">Pending Approval</p>
-      {% endif %}
     </div>
     <a href="{{ site.baseurl }}/releases/{{ release.tag }}" class="release-link">View Details →</a>
   </div>
