@@ -166,38 +166,76 @@ jobs:
             core.setOutput('approvers', approvers.join(', '));
 
       - name: Update release details file
-        run: |
-          git config --global user.name "Release Approval App[bot]"
-          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          
-          # Get release info
-          release_tag="${{ steps.get_release.outputs.tag_name }}"
-          release_file="releases/$release_tag.md"
-          
-          # Get current content after front matter
-          content=$(awk '/^---/{n++;next} n==2{p=NR+1;exit} {print}' "$release_file")
-          
-          # Find the line with Release Date
-          release_date_line=$(echo "$content" | grep "Release Date")
-          
-          # Create new content with Approval Date and Approvers after Release Date
-          new_content=$(echo "$content" | sed "s|$release_date_line|$release_date_line\n- **Approval Date**: ${{ github.event.pull_request.merged_at }}\n- **Approved By**: ${{ steps.get_release.outputs.approvers }}|")
-          
-          # Create the updated file content
-          echo "---" > "$release_file"
-          echo "layout: default" >> "$release_file"
-          echo "title: \"Release Approval: ${{ steps.get_release.outputs.tag_name }}\"" >> "$release_file"
-          echo "tag: \"${{ steps.get_release.outputs.tag_name }}\"" >> "$release_file"
-          echo "release_date: \"${{ steps.get_release.outputs.created_at }}\"" >> "$release_file"
-          echo "approval_date: \"${{ github.event.pull_request.merged_at }}\"" >> "$release_file"
-          echo "approvers: \"${{ steps.get_release.outputs.approvers }}\"" >> "$release_file"
-          echo "---" >> "$release_file"
-          echo "" >> "$release_file"
-          echo "$new_content" >> "$release_file"
-          
-          git add "$release_file"
-          git commit -m "docs: update release details with approval date and approvers"
-          git push origin main
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ steps.generate_token.outputs.token }}
+          script: |
+            const tagName = context.payload.pull_request.head.ref.replace('release-approval-', '');
+            
+            // Get release info
+            const releases = await github.rest.repos.listReleases({
+              owner: context.repo.owner,
+              repo: context.repo.repo
+            });
+            
+            const release = releases.data.find(r => r.tag_name === tagName && r.prerelease);
+            if (!release) {
+              core.setFailed(`No pre-release found for tag ${tagName}`);
+              return;
+            }
+
+            // Get PR reviews
+            const reviews = await github.rest.pulls.listReviews({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number
+            });
+            
+            // Get unique approvers
+            const approvers = [...new Set(
+              reviews.data
+                .filter(review => review.state === 'APPROVED')
+                .map(review => review.user.login)
+            )];
+
+            // Read current file content
+            const { data: fileContent } = await github.rest.repos.getContent({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              path: `releases/${tagName}.md`,
+              ref: 'main'
+            });
+
+            // Create new file content
+            const newContent = `---
+layout: default
+title: "Release Approval: ${release.name}"
+tag: "${tagName}"
+release_date: "${release.created_at}"
+approval_date: "${context.payload.pull_request.merged_at}"
+approvers: "${approvers.join(', ')}"
+---
+
+# Release Approval: ${release.name}
+
+- **Tag**: ${tagName}
+- **Release Date**: ${release.created_at}
+- **Approval Date**: ${context.payload.pull_request.merged_at}
+- **Approved By**: ${approvers.join(', ')}
+
+## Release Notes
+${release.body}`;
+
+            // Update file
+            await github.rest.repos.createOrUpdateFileContents({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              path: `releases/${tagName}.md`,
+              message: 'docs: update release details with approval date and approvers',
+              content: Buffer.from(newContent).toString('base64'),
+              sha: fileContent.sha,
+              branch: 'main'
+            });
 
       - name: Promote to production release
         if: success()
