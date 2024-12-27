@@ -92,7 +92,10 @@
       "title": "Release v1.0.47",
       "tag": "v1.0.47",
       "release_date": "2024-12-27T18:41:09Z",
-      "notes": "Testing PR approvers collection"
+      "notes": "Testing PR approvers collection",
+      "approval_date": "2024-12-27T18:43:07Z",
+      "approvers": "keren-cw",
+      "approval_time_minutes": 1
     }
   ]
 }
