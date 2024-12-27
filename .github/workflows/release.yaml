@@ -30,6 +30,15 @@ jobs:
         with:
           token: ${{ steps.generate_token.outputs.token }}
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
       - name: Get release info
         id: release_info
         uses: actions/github-script@v6
@@ -156,6 +165,15 @@ jobs:
         uses: actions/checkout@v3
         with:
           token: ${{ steps.generate_token.outputs.token }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
 
       - name: Get release from tag and reviews
         id: get_release
