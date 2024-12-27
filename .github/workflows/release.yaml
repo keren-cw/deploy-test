@@ -17,12 +17,14 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+        with:
+          token: ${{ secrets.RELEASE_TOKEN }}
 
       - name: Get release info
         id: release_info
         uses: actions/github-script@v6
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.RELEASE_TOKEN }}
           script: |
             const release = await github.rest.repos.getRelease({
               owner: context.repo.owner,
@@ -62,7 +64,7 @@ jobs:
         id: create_pr
         uses: actions/github-script@v6
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.RELEASE_TOKEN }}
           script: |
             const pr = await github.rest.pulls.create({
               owner: context.repo.owner,
@@ -96,7 +98,7 @@ jobs:
       - name: Check PR status
         uses: actions/github-script@v6
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.RELEASE_TOKEN }}
           script: |
             const pr_number = ${{ needs.create_approval_pr.outputs.pr_number }};
             
@@ -115,7 +117,7 @@ jobs:
       - name: Promote to production release
         uses: actions/github-script@v6
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.RELEASE_TOKEN }}
           script: |
             await github.rest.repos.updateRelease({
               owner: context.repo.owner,
