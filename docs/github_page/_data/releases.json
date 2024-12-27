@@ -101,7 +101,10 @@
       "title": "Release v1.0.48",
       "tag": "v1.0.48",
       "release_date": "2024-12-27T21:59:23Z",
-      "notes": "Testing workflow with updated timestamp display"
+      "notes": "Testing workflow with updated timestamp display",
+      "approval_date": "2024-12-27T22:05:39Z",
+      "approvers": "keren-cw",
+      "approval_time_minutes": 6
     }
   ]
 }
