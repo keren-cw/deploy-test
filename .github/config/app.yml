@@ -1,8 +1,7 @@
 # GitHub App Configuration
 app:
-  name: "Release Approval App"
-  email: "release-approval[bot]@users.noreply.github.com"
-  token_action: "tibdex/github-app-token@v2"
+  name: "QE Release Approval"
+  token_action: "actions/create-github-app-token@v1"
 
 # Reviewers Configuration
 reviewers:
@@ -12,8 +11,7 @@ reviewers:
 # Git Configuration
 git:
   user:
-    name: "Release Approval App"
-    email: "release-approval[bot]@users.noreply.github.com"
+    name: "QE Release Approval"
   commit_messages:
     add_release: "docs: add release details for %s"
     update_release: "docs: update release details with approval date and approvers" 
