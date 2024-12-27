@@ -117,7 +117,7 @@ jobs:
         with:
           token: ${{ steps.generate_token.outputs.token }}
 
-      - name: Get release from tag
+      - name: Get release from tag and reviews
         id: get_release
         uses: actions/github-script@v6
         with:
@@ -138,8 +138,23 @@ jobs:
               return;
             }
             
+            // Get PR reviews
+            const reviews = await github.rest.pulls.listReviews({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number
+            });
+            
+            // Get unique approvers
+            const approvers = [...new Set(
+              reviews.data
+                .filter(review => review.state === 'APPROVED')
+                .map(review => review.user.login)
+            )];
+            
             core.setOutput('release_id', release.id);
             core.setOutput('tag_name', tagName);
+            core.setOutput('approvers', approvers.join(', '));
 
       - name: Update release details file
         run: |
@@ -152,11 +167,11 @@ jobs:
           # Find the line with Release Date
           release_date_line=$(echo "$content" | grep "Release Date")
           
-          # Create new content with Approval Date after Release Date
-          echo "$content" | sed "s|$release_date_line|$release_date_line\n- **Approval Date**: ${{ github.event.pull_request.merged_at }}|" > releases/${{ steps.get_release.outputs.tag_name }}.md
+          # Create new content with Approval Date and Approvers after Release Date
+          echo "$content" | sed "s|$release_date_line|$release_date_line\n- **Approval Date**: ${{ github.event.pull_request.merged_at }}\n- **Approved By**: ${{ steps.get_release.outputs.approvers }}|" > releases/${{ steps.get_release.outputs.tag_name }}.md
           
           git add releases/${{ steps.get_release.outputs.tag_name }}.md
-          git commit -m "docs: update release details with approval date"
+          git commit -m "docs: update release details with approval date and approvers"
           git push origin main
 
       - name: Promote to production release
