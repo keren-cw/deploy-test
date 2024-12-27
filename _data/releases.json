@@ -24,6 +24,12 @@
       "approval_date": "2024-12-27T16:27:30Z",
       "approvers": "release-approval-app[bot]",
       "approval_time_minutes": 6
+    },
+    {
+      "title": "Release v1.0.37",
+      "tag": "v1.0.37",
+      "release_date": "2024-12-27T16:31:20Z",
+      "notes": "Testing with releases.json in _data directory"
     }
   ]
 }
