@@ -5,8 +5,8 @@ on:
     types: [prereleased]
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
+  pull-requests: read
 
 jobs:
   create_approval_pr:
@@ -15,16 +15,23 @@ jobs:
       pr_number: ${{ steps.create_pr.outputs.pr_number }}
     
     steps:
+      - name: Generate App token
+        id: generate_token
+        uses: tibdex/github-app-token@v2
+        with:
+          app_id: ${{ secrets.APP_ID }}
+          private_key: ${{ secrets.APP_PRIVATE_KEY }}
+
       - name: Checkout code
         uses: actions/checkout@v3
         with:
-          token: ${{ secrets.RELEASE_TOKEN }}
+          token: ${{ steps.generate_token.outputs.token }}
 
       - name: Get release info
         id: release_info
         uses: actions/github-script@v6
         with:
-          github-token: ${{ secrets.RELEASE_TOKEN }}
+          github-token: ${{ steps.generate_token.outputs.token }}
           script: |
             const release = await github.rest.repos.getRelease({
               owner: context.repo.owner,
@@ -39,8 +46,8 @@ jobs:
 
       - name: Create release approval branch
         run: |
-          git config --global user.name "GitHub Actions"
-          git config --global user.email "actions@github.com"
+          git config --global user.name "Release Approval Bot[bot]"
+          git config --global user.email "release-approval-bot[bot]@users.noreply.github.com"
           git checkout -b release-approval-${{ steps.release_info.outputs.tag_name }}
 
       - name: Create release details file
@@ -64,7 +71,7 @@ jobs:
         id: create_pr
         uses: actions/github-script@v6
         with:
-          github-token: ${{ secrets.RELEASE_TOKEN }}
+          github-token: ${{ steps.generate_token.outputs.token }}
           script: |
             const pr = await github.rest.pulls.create({
               owner: context.repo.owner,
@@ -95,10 +102,17 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
+      - name: Generate App token
+        id: generate_token
+        uses: tibdex/github-app-token@v2
+        with:
+          app_id: ${{ secrets.APP_ID }}
+          private_key: ${{ secrets.APP_PRIVATE_KEY }}
+
       - name: Check PR status
         uses: actions/github-script@v6
         with:
-          github-token: ${{ secrets.RELEASE_TOKEN }}
+          github-token: ${{ steps.generate_token.outputs.token }}
           script: |
             const pr_number = ${{ needs.create_approval_pr.outputs.pr_number }};
             
@@ -117,7 +131,7 @@ jobs:
       - name: Promote to production release
         uses: actions/github-script@v6
         with:
-          github-token: ${{ secrets.RELEASE_TOKEN }}
+          github-token: ${{ steps.generate_token.outputs.token }}
           script: |
             await github.rest.repos.updateRelease({
               owner: context.repo.owner,
