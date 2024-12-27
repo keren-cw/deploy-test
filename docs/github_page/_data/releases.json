@@ -74,7 +74,10 @@
       "title": "Release v1.0.45",
       "tag": "v1.0.45",
       "release_date": "2024-12-27T21:26:17Z",
-      "notes": "Testing improved PR content and branch naming"
+      "notes": "Testing improved PR content and branch naming",
+      "approval_date": "2024-12-27T21:29:30Z",
+      "approvers": "qe-release-approval[bot]",
+      "approval_time_minutes": 3
     }
   ]
 }
