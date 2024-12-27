@@ -1,0 +1,10 @@
+title: Release History
+description: History of all approved releases
+theme: jekyll-theme-minimal
+
+defaults:
+  - scope:
+      path: "releases"
+      type: "pages"
+    values:
+      layout: "default" 

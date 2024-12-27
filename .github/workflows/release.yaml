@@ -9,6 +9,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  pages: write
 
 jobs:
   create_approval_pr:
@@ -55,6 +56,13 @@ jobs:
         run: |
           mkdir -p releases
           cat > releases/${{ steps.release_info.outputs.tag_name }}.md << EOL
+          ---
+          layout: default
+          title: "Release Approval: ${{ steps.release_info.outputs.release_name }}"
+          tag: "${{ steps.release_info.outputs.tag_name }}"
+          release_date: "${{ steps.release_info.outputs.created_at }}"
+          ---
+
           # Release Approval: ${{ steps.release_info.outputs.release_name }}
           
           - **Tag**: ${{ steps.release_info.outputs.tag_name }}
@@ -161,14 +169,28 @@ jobs:
           git config --global user.name "Release Approval App[bot]"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
           
-          # Get current content
-          content=$(cat releases/${{ steps.get_release.outputs.tag_name }}.md)
+          # Get current content after front matter
+          content=$(awk '/^---/{n++;next} n==2{p=NR+1;exit} {print}' releases/${{ steps.get_release.outputs.tag_name }}.md)
           
           # Find the line with Release Date
           release_date_line=$(echo "$content" | grep "Release Date")
           
           # Create new content with Approval Date and Approvers after Release Date
-          echo "$content" | sed "s|$release_date_line|$release_date_line\n- **Approval Date**: ${{ github.event.pull_request.merged_at }}\n- **Approved By**: ${{ steps.get_release.outputs.approvers }}|" > releases/${{ steps.get_release.outputs.tag_name }}.md
+          new_content=$(echo "$content" | sed "s|$release_date_line|$release_date_line\n- **Approval Date**: ${{ github.event.pull_request.merged_at }}\n- **Approved By**: ${{ steps.get_release.outputs.approvers }}|")
+          
+          # Add front matter back
+          cat > releases/${{ steps.get_release.outputs.tag_name }}.md << EOL
+          ---
+          layout: default
+          title: "Release Approval: ${{ steps.release_info.outputs.release_name }}"
+          tag: "${{ steps.release_info.outputs.tag_name }}"
+          release_date: "${{ steps.release_info.outputs.created_at }}"
+          approval_date: "${{ github.event.pull_request.merged_at }}"
+          approvers: "${{ steps.get_release.outputs.approvers }}"
+          ---
+
+          $new_content
+          EOL
           
           git add releases/${{ steps.get_release.outputs.tag_name }}.md
           git commit -m "docs: update release details with approval date and approvers"
@@ -187,3 +209,12 @@ jobs:
               prerelease: false,
               draft: false
             });
+
+  deploy_pages:
+    needs: promote_release
+    if: success()
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Deploy GitHub Pages
+        uses: actions/deploy-pages@v2
