@@ -124,6 +124,12 @@ jobs:
                else . end
              )' docs/github_page/_data/releases.json > temp.json && mv temp.json docs/github_page/_data/releases.json
           
+      - name: Update release status
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          gh release edit ${{ steps.release.outputs.tag }} --prerelease=false --latest
+          
       - name: Commit and push changes
         run: |
           git add docs/github_page/_data/releases.json
