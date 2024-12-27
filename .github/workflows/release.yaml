@@ -3,8 +3,10 @@ name: Release Approval
 on:
   release:
     types: [published]
-  pull_request_review:
-    types: [submitted]
+  pull_request:
+    types: [closed]
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
@@ -73,7 +75,7 @@ jobs:
             --head release-approval-${{ steps.release.outputs.tag }}
 
   update-release-status:
-    if: github.event_name == 'pull_request_review' && github.event.review.state == 'approved' && startsWith(github.event.pull_request.head.ref, 'release-approval-')
+    if: github.event_name == 'pull_request' && github.event.pull_request.merged == true && startsWith(github.event.pull_request.head.ref, 'release-approval-')
     runs-on: ubuntu-latest
     steps:
       - name: Generate App token
@@ -86,7 +88,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           token: ${{ steps.generate_token.outputs.token }}
-          ref: ${{ github.event.pull_request.head.ref }}
+          ref: main
           
       - name: Get release tag
         id: release
@@ -99,7 +101,7 @@ jobs:
         run: |
           jq --arg tag "${{ steps.release.outputs.tag }}" \
              --arg date "${{ steps.release.outputs.approval_date }}" \
-             --arg approver "${{ github.event.review.user.login }}" \
+             --arg approver "${{ github.event.pull_request.user.login }}" \
              --argjson minutes "$(( ($(date -u +%s) - $(date -u -d "${{ github.event.pull_request.created_at }}" +%s)) / 60 ))" \
              '.releases |= map(
                if .tag == $tag then
@@ -118,16 +120,10 @@ jobs:
           git add releases.json
           git commit -m "Update release status: ${{ steps.release.outputs.tag }}"
           git push
-          
-      - name: Auto-merge PR
-        env:
-          GH_TOKEN: ${{ steps.generate_token.outputs.token }}
-        run: |
-          gh pr merge ${{ github.event.pull_request.number }} --merge --delete-branch
 
   pages:
     needs: [update-release-status]
-    if: github.event_name == 'pull_request_review' && github.event.review.state == 'approved'
+    if: github.event_name == 'pull_request' && github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     environment:
       name: github-pages
