@@ -10,6 +10,7 @@ permissions:
   contents: write
   pull-requests: write
   pages: write
+  id-token: write
 
 jobs:
   create_approval_pr:
@@ -214,7 +215,26 @@ jobs:
     needs: promote_release
     if: success()
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     
     steps:
-      - name: Deploy GitHub Pages
-        uses: actions/deploy-pages@v2
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Build with Jekyll
+        uses: actions/jekyll-build-pages@v1
+        with:
+          source: ./
+          destination: ./_site
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v2
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v3
