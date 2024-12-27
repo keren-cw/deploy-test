@@ -200,6 +200,8 @@ title: Release History Dashboard
 }
 </style>
 
+<link rel="stylesheet" href="{{ site.baseurl }}/assets/css/style.css">
+<script src="{{ site.baseurl }}/assets/js/scale.fix.js"></script>
 <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
