@@ -42,7 +42,7 @@ jobs:
         id: release
         run: |
           echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
-          echo "date=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
+          echo "date=$(TZ='America/Sao_Paulo' date +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
           
       - name: Create release branch
         run: |
@@ -110,7 +110,7 @@ jobs:
         run: |
           TAG=${GITHUB_HEAD_REF#approval-}
           echo "tag=$TAG" >> $GITHUB_OUTPUT
-          echo "approval_date=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
+          echo "approval_date=$(TZ='America/Sao_Paulo' date +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
           
       - name: Get PR approvers
         id: approvers
@@ -126,7 +126,7 @@ jobs:
           jq --arg tag "${{ steps.release.outputs.tag }}" \
              --arg date "${{ steps.release.outputs.approval_date }}" \
              --arg approvers "${{ steps.approvers.outputs.list }}" \
-             --argjson minutes "$(( ($(date -u +%s) - $(date -u -d "${{ github.event.pull_request.created_at }}" +%s)) / 60 ))" \
+             --argjson minutes "$(( ($(TZ='America/Sao_Paulo' date +%s) - $(TZ='America/Sao_Paulo' date -d "${{ github.event.pull_request.created_at }}" +%s)) / 60 ))" \
              '.releases |= map(
                if .tag == $tag then
                  . + {

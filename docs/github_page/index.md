@@ -106,8 +106,8 @@ title: Release History Dashboard
     <h3>{{ release.title }}</h3>
     <div class="release-meta">
       <p><strong>Tag:</strong> {{ release.tag }}</p>
-      <p><strong>Released:</strong> {{ release.release_date | date: "%Y-%m-%d %H:%M" }}</p>
-      <p><strong>Approved:</strong> {{ release.approval_date | date: "%Y-%m-%d %H:%M" }}</p>
+      <p><strong>Released:</strong> {{ release.release_date | date: "%Y-%m-%d %H:%M" }} BRT</p>
+      <p><strong>Approved:</strong> {{ release.approval_date | date: "%Y-%m-%d %H:%M" }} BRT</p>
       <p><strong>Approvers:</strong> {{ release.approvers }}</p>
       <p><strong>Approval Time:</strong> {{ release.approval_time_minutes | divided_by: 60.0 | round: 2 }} hours</p>
     </div>
