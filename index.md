@@ -38,8 +38,20 @@ title: Release History Dashboard
     {% endfor %}
     
     <div class="metric-value">
-      <p><strong>Last 7 days:</strong> {{ week_total | divided_by: week_count | divided_by: 60 }} minutes</p>
-      <p><strong>Last 30 days:</strong> {{ month_total | divided_by: month_count | divided_by: 60 }} minutes</p>
+      <p><strong>Last 7 days:</strong> 
+      {% if week_count > 0 %}
+        {{ week_total | divided_by: week_count | divided_by: 60 }} minutes
+      {% else %}
+        No data
+      {% endif %}
+      </p>
+      <p><strong>Last 30 days:</strong> 
+      {% if month_count > 0 %}
+        {{ month_total | divided_by: month_count | divided_by: 60 }} minutes
+      {% else %}
+        No data
+      {% endif %}
+      </p>
     </div>
   </div>
 
@@ -59,8 +71,20 @@ title: Release History Dashboard
     {% endfor %}
     
     <div class="metric-value">
-      <p><strong>Last 7 days:</strong> {{ week_releases | divided_by: 7.0 | round: 2 }} releases/day</p>
-      <p><strong>Last 30 days:</strong> {{ month_releases | divided_by: 30.0 | round: 2 }} releases/day</p>
+      <p><strong>Last 7 days:</strong> 
+      {% if week_releases > 0 %}
+        {{ week_releases | divided_by: 7.0 | round: 2 }} releases/day
+      {% else %}
+        No releases
+      {% endif %}
+      </p>
+      <p><strong>Last 30 days:</strong> 
+      {% if month_releases > 0 %}
+        {{ month_releases | divided_by: 30.0 | round: 2 }} releases/day
+      {% else %}
+        No releases
+      {% endif %}
+      </p>
     </div>
   </div>
 </div>
@@ -191,42 +215,46 @@ document.addEventListener('DOMContentLoaded', function() {
         {% endfor %}
     ];
 
-    var data = [{
-        x: releases.map(r => r.name),
-        y: releases.map(r => (new Date(r.approvalDate) - new Date(r.releaseDate)) / (1000 * 60)),
-        text: releases.map(r => `Approved by: ${r.approvers}`),
-        type: 'bar',
-        marker: {
-            color: '#3498db',
-            opacity: 0.8
-        }
-    }];
+    if (releases.length > 0) {
+        var data = [{
+            x: releases.map(r => r.name),
+            y: releases.map(r => (new Date(r.approvalDate) - new Date(r.releaseDate)) / (1000 * 60)),
+            text: releases.map(r => `Approved by: ${r.approvers}`),
+            type: 'bar',
+            marker: {
+                color: '#3498db',
+                opacity: 0.8
+            }
+        }];
 
-    var layout = {
-        title: 'Release Approval Times',
-        paper_bgcolor: 'rgba(0,0,0,0)',
-        plot_bgcolor: 'rgba(0,0,0,0)',
-        xaxis: {
-            title: 'Release Tag',
-            tickangle: -45,
-            gridcolor: '#eee'
-        },
-        yaxis: {
-            title: 'Time to Approval (minutes)',
-            gridcolor: '#eee'
-        },
-        hovermode: 'closest',
-        margin: {
-            l: 60,
-            r: 20,
-            t: 40,
-            b: 80
-        }
-    };
+        var layout = {
+            title: 'Release Approval Times',
+            paper_bgcolor: 'rgba(0,0,0,0)',
+            plot_bgcolor: 'rgba(0,0,0,0)',
+            xaxis: {
+                title: 'Release Tag',
+                tickangle: -45,
+                gridcolor: '#eee'
+            },
+            yaxis: {
+                title: 'Time to Approval (minutes)',
+                gridcolor: '#eee'
+            },
+            hovermode: 'closest',
+            margin: {
+                l: 60,
+                r: 20,
+                t: 40,
+                b: 80
+            }
+        };
 
-    var config = {
-        responsive: true
-    };
+        var config = {
+            responsive: true
+        };
 
-    Plotly.newPlot('approval-chart', data, layout, config);
+        Plotly.newPlot('approval-chart', data, layout, config);
+    } else {
+        document.getElementById('approval-chart').innerHTML = '<p style="text-align: center; padding: 20px;">No approval data available</p>';
+    }
 });</script> 
