@@ -146,11 +146,17 @@ jobs:
           git config --global user.name "Release Approval App[bot]"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
           
-          # Add merge timestamp to the file
-          echo -e "\n## Approval Details\n- **Merged At**: ${{ github.event.pull_request.merged_at }}" >> releases/${{ steps.get_release.outputs.tag_name }}.md
+          # Get current content
+          content=$(cat releases/${{ steps.get_release.outputs.tag_name }}.md)
+          
+          # Find the line with Release Date
+          release_date_line=$(echo "$content" | grep "Release Date")
+          
+          # Create new content with Approval Date after Release Date
+          echo "$content" | sed "s|$release_date_line|$release_date_line\n- **Approval Date**: ${{ github.event.pull_request.merged_at }}|" > releases/${{ steps.get_release.outputs.tag_name }}.md
           
           git add releases/${{ steps.get_release.outputs.tag_name }}.md
-          git commit -m "docs: update release details with merge timestamp"
+          git commit -m "docs: update release details with approval date"
           git push origin main
 
       - name: Promote to production release
