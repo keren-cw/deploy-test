@@ -3,6 +3,8 @@ layout: default
 title: Release History Dashboard
 ---
 
+{% assign sorted_releases = site.pages | where_exp: "item", "item.path contains 'releases/'" | sort: "release_date" | reverse %}
+
 # Release History Dashboard
 
 ## Release Metrics

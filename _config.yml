@@ -20,6 +20,12 @@ defaults:
     values:
       layout: "release"
 
+# Collections
+collections:
+  releases:
+    output: true
+    permalink: /releases/:path/
+
 # Plugins
 plugins:
   - jekyll-github-pages 
