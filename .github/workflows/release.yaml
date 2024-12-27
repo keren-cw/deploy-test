@@ -189,7 +189,9 @@ jobs:
 
   deploy_pages:
     needs: promote_release
-    if: success()
+    if: |
+      success() &&
+      github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
