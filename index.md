@@ -4,6 +4,7 @@ title: Release History Dashboard
 ---
 
 {% assign repository_name = site.github.repository_name %}
+{% assign repository_owner = site.github.owner_name %}
 {% assign sorted_releases = site.pages | where_exp: "item", "item.path contains 'releases/'" | sort: "release_date" | reverse %}
 
 # Release History Dashboard
@@ -109,7 +110,7 @@ title: Release History Dashboard
       <p><strong>Approvers:</strong> {{ release.approvers }}</p>
       <p><strong>Approval Time:</strong> {{ release.approval_time_minutes }} minutes</p>
     </div>
-    <a href="{{ site.baseurl }}/releases/{{ release.tag }}.html" class="release-link">View Details →</a>
+    <a href="https://github.com/{{ repository_owner }}/{{ repository_name }}/releases/tag/{{ release.tag }}" class="release-link">View Details →</a>
   </div>
 {% endfor %}
 </div>
