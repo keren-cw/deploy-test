@@ -18,7 +18,16 @@ jobs:
     if: github.event_name == 'release'
     runs-on: ubuntu-latest
     steps:
+      - name: Generate App token
+        id: generate_token
+        uses: tibdex/github-app-token@v2
+        with:
+          app_id: ${{ secrets.APP_ID }}
+          private_key: ${{ secrets.APP_PRIVATE_KEY }}
+
       - uses: actions/checkout@v4
+        with:
+          token: ${{ steps.generate_token.outputs.token }}
       
       - name: Get release details
         id: release
@@ -51,7 +60,7 @@ jobs:
           
       - name: Create Pull Request
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.generate_token.outputs.token }}
         run: |
           git add releases.json
           git commit -m "Release Approval: ${{ steps.release.outputs.tag }}"
@@ -67,8 +76,16 @@ jobs:
     if: github.event_name == 'pull_request_review' && github.event.review.state == 'approved' && startsWith(github.event.pull_request.head.ref, 'release-approval-')
     runs-on: ubuntu-latest
     steps:
+      - name: Generate App token
+        id: generate_token
+        uses: tibdex/github-app-token@v2
+        with:
+          app_id: ${{ secrets.APP_ID }}
+          private_key: ${{ secrets.APP_PRIVATE_KEY }}
+
       - uses: actions/checkout@v4
         with:
+          token: ${{ steps.generate_token.outputs.token }}
           ref: ${{ github.event.pull_request.head.ref }}
           
       - name: Get release tag
@@ -104,7 +121,7 @@ jobs:
           
       - name: Auto-merge PR
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.generate_token.outputs.token }}
         run: |
           gh pr merge ${{ github.event.pull_request.number }} --merge --delete-branch
 
@@ -116,9 +133,17 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - name: Generate App token
+        id: generate_token
+        uses: tibdex/github-app-token@v2
+        with:
+          app_id: ${{ secrets.APP_ID }}
+          private_key: ${{ secrets.APP_PRIVATE_KEY }}
+
       - name: Checkout
         uses: actions/checkout@v4
         with:
+          token: ${{ steps.generate_token.outputs.token }}
           ref: main
       
       - name: Setup Pages
