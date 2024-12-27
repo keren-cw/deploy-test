@@ -2,17 +2,18 @@ title: Release History
 description: History of all approved releases with approval times
 theme: jekyll-theme-minimal
 
-collections:
-  releases:
-    output: true
-    permalink: /releases/:name
+# Release files configuration
+include:
+  - "releases/*.md"
 
+# Default layout for release files
 defaults:
   - scope:
-      path: ""
-      type: "releases"
+      path: "releases"
+      type: "pages"
     values:
       layout: "release"
 
+# Plugins
 plugins:
   - jekyll-github-pages 

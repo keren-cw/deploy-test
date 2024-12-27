@@ -27,6 +27,11 @@ module.exports = async ({ github, context, core }) => {
       .map(review => review.user.login)
   )];
 
+  // Calculate approval time
+  const releaseDate = new Date(release.created_at);
+  const approvalDate = new Date(context.payload.pull_request.merged_at);
+  const approvalTimeMinutes = Math.floor((approvalDate - releaseDate) / (1000 * 60));
+
   // Read current file content
   const { data: fileContent } = await github.rest.repos.getContent({
     owner: context.repo.owner,
@@ -44,6 +49,7 @@ module.exports = async ({ github, context, core }) => {
     `release_date: "${release.created_at}"`,
     `approval_date: "${context.payload.pull_request.merged_at}"`,
     `approvers: "${approvers.join(', ')}"`,
+    `approval_time_minutes: ${approvalTimeMinutes}`,
     '---',
     '',
     `# Release Approval: ${release.name}`,
@@ -52,6 +58,7 @@ module.exports = async ({ github, context, core }) => {
     `- **Release Date**: ${release.created_at}`,
     `- **Approval Date**: ${context.payload.pull_request.merged_at}`,
     `- **Approved By**: ${approvers.join(', ')}`,
+    `- **Approval Time**: ${approvalTimeMinutes} minutes`,
     '',
     '## Release Notes',
     release.body || ''
