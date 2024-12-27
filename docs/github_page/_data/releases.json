@@ -47,7 +47,10 @@
       "title": "Release v1.0.39",
       "tag": "v1.0.39",
       "release_date": "2024-12-27T20:50:05Z",
-      "notes": "Testing with Release Approval App identity"
+      "notes": "Testing with Release Approval App identity",
+      "approval_date": "2024-12-27T20:50:47Z",
+      "approvers": "release-approval-app[bot]",
+      "approval_time_minutes": 0
     }
   ]
 }
