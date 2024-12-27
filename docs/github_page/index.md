@@ -45,14 +45,14 @@ title: Release History Dashboard
     <div class="metric-value">
       <p><strong>Last 7 days:</strong> 
       {% if week_count > 0 %}
-        {{ week_total | divided_by: week_count | divided_by: 60 }} minutes
+        {{ week_total | divided_by: week_count | divided_by: 3600.0 | round: 2 }} hours
       {% else %}
         No data
       {% endif %}
       </p>
       <p><strong>Last 30 days:</strong> 
       {% if month_count > 0 %}
-        {{ month_total | divided_by: month_count | divided_by: 60 }} minutes
+        {{ month_total | divided_by: month_count | divided_by: 3600.0 | round: 2 }} hours
       {% else %}
         No data
       {% endif %}
@@ -106,10 +106,10 @@ title: Release History Dashboard
     <h3>{{ release.title }}</h3>
     <div class="release-meta">
       <p><strong>Tag:</strong> {{ release.tag }}</p>
-      <p><strong>Released:</strong> {{ release.release_date | date: "%Y-%m-%d %H:%M" }}</p>
-      <p><strong>Approved:</strong> {{ release.approval_date | date: "%Y-%m-%d %H:%M" }}</p>
+      <p><strong>Released:</strong> {{ release.release_date | date: "%Y-%m-%d %H:%M" }} BRT</p>
+      <p><strong>Approved:</strong> {{ release.approval_date | date: "%Y-%m-%d %H:%M" }} BRT</p>
       <p><strong>Approvers:</strong> {{ release.approvers }}</p>
-      <p><strong>Approval Time:</strong> {{ release.approval_time_minutes }} minutes</p>
+      <p><strong>Approval Time:</strong> {{ release.approval_time_minutes | divided_by: 60.0 | round: 2 }} hours</p>
     </div>
     <a href="https://github.com/{{ repository_owner }}/{{ repository_name }}/releases/tag/{{ release.tag }}" class="release-link">View Details →</a>
   </div>
@@ -221,7 +221,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (releases.length > 0) {
         var data = [{
             x: releases.map(r => r.name),
-            y: releases.map(r => (new Date(r.approvalDate) - new Date(r.releaseDate)) / (1000 * 60)),
+            y: releases.map(r => (new Date(r.approvalDate) - new Date(r.releaseDate)) / (1000 * 60 * 60)),
             text: releases.map(r => `Approved by: ${r.approvers}`),
             type: 'bar',
             marker: {
@@ -240,7 +240,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 gridcolor: '#eee'
             },
             yaxis: {
-                title: 'Time to Approval (minutes)',
+                title: 'Time to Approval (hours)',
                 gridcolor: '#eee'
             },
             hovermode: 'closest',
@@ -252,12 +252,9 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         };
 
-        var config = {
-            responsive: true
-        };
-
-        Plotly.newPlot('approval-chart', data, layout, config);
+        Plotly.newPlot('approval-chart', data, layout, {responsive: true});
     } else {
         document.getElementById('approval-chart').innerHTML = '<p style="text-align: center; padding: 20px;">No approval data available</p>';
     }
-});</script> 
+});
+</script> 
