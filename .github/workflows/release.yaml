@@ -47,38 +47,64 @@ jobs:
             core.setOutput('created_at', release.data.created_at);
             core.setOutput('body', release.data.body || '');
 
+      - name: Setup git config
+        id: git_config
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const config = require('./.github/scripts/config.js');
+            const gitConfig = config.getGitConfig();
+            core.setOutput('user_name', gitConfig.name);
+            core.setOutput('user_email', gitConfig.email);
+
       - name: Create release approval branch
         run: |
-          git config --global user.name "Release Approval App[bot]"
-          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "${{ steps.git_config.outputs.user_name }}"
+          git config --global user.email "${{ steps.git_config.outputs.user_email }}"
           git checkout -b release-approval-${{ steps.release_info.outputs.tag_name }}
 
       - name: Create release details file
-        run: |
-          git config --global user.name "Release Approval App"
-          git config --global user.email "release-approval[bot]@users.noreply.github.com"
-          
-          mkdir -p releases
-          cat > releases/${{ steps.release_info.outputs.tag_name }}.md << EOL
-          ---
-          layout: default
-          title: "Release Approval: ${{ steps.release_info.outputs.release_name }}"
-          tag: "${{ steps.release_info.outputs.tag_name }}"
-          release_date: "${{ steps.release_info.outputs.created_at }}"
-          ---
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ steps.generate_token.outputs.token }}
+          script: |
+            const fs = require('fs');
+            const config = require('./.github/scripts/config.js');
+            const gitConfig = config.getGitConfig();
+            
+            const content = `---
+            layout: default
+            title: "Release Approval: ${process.env.RELEASE_NAME}"
+            tag: "${process.env.TAG_NAME}"
+            release_date: "${process.env.CREATED_AT}"
+            ---
 
-          # Release Approval: ${{ steps.release_info.outputs.release_name }}
-          
-          - **Tag**: ${{ steps.release_info.outputs.tag_name }}
-          - **Release Date**: ${{ steps.release_info.outputs.created_at }}
-          
-          ## Release Notes
-          ${{ steps.release_info.outputs.body }}
-          EOL
-          
-          git add releases/${{ steps.release_info.outputs.tag_name }}.md
-          git -c user.name="Release Approval App" -c user.email="release-approval[bot]@users.noreply.github.com" commit -m "docs: add release details for ${{ steps.release_info.outputs.tag_name }}"
-          git push origin release-approval-${{ steps.release_info.outputs.tag_name }}
+            # Release Approval: ${process.env.RELEASE_NAME}
+            
+            - **Tag**: ${process.env.TAG_NAME}
+            - **Release Date**: ${process.env.CREATED_AT}
+            
+            ## Release Notes
+            ${process.env.BODY}`;
+            
+            const dir = 'releases';
+            if (!fs.existsSync(dir)) {
+              fs.mkdirSync(dir);
+            }
+            
+            const filePath = `${dir}/${process.env.TAG_NAME}.md`;
+            fs.writeFileSync(filePath, content);
+            
+            await exec.exec('git', ['config', '--global', 'user.name', gitConfig.name]);
+            await exec.exec('git', ['config', '--global', 'user.email', gitConfig.email]);
+            await exec.exec('git', ['add', filePath]);
+            await exec.exec('git', ['commit', '-m', config.getCommitMessage('add_release', process.env.TAG_NAME)]);
+            await exec.exec('git', ['push', 'origin', `release-approval-${process.env.TAG_NAME}`]);
+        env:
+          TAG_NAME: ${{ steps.release_info.outputs.tag_name }}
+          RELEASE_NAME: ${{ steps.release_info.outputs.release_name }}
+          CREATED_AT: ${{ steps.release_info.outputs.created_at }}
+          BODY: ${{ steps.release_info.outputs.body }}
 
       - name: Create Pull Request
         id: create_pr
@@ -86,6 +112,8 @@ jobs:
         with:
           github-token: ${{ steps.generate_token.outputs.token }}
           script: |
+            const config = require('./.github/scripts/config.js');
+            
             const pr = await github.rest.pulls.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -97,12 +125,12 @@ jobs:
               base: 'main'
             });
             
-            // Add reviewers
+            // Add reviewers from config
             await github.rest.pulls.requestReviewers({
               owner: context.repo.owner,
               repo: context.repo.repo,
               pull_number: pr.data.number,
-              reviewers: ['keren-cw', 'ingrid-cw']
+              reviewers: config.getReviewers()
             });
         env:
           TAG_NAME: ${{ steps.release_info.outputs.tag_name }}
