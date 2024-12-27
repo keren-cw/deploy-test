@@ -9,6 +9,12 @@
       "approvers": "",
       "approval_time_minutes": 3,
       "notes": "Testing corrected release details link"
+    },
+    {
+      "title": "Release v1.0.35",
+      "tag": "v1.0.35",
+      "release_date": "2024-12-27T15:48:01Z",
+      "notes": "Testing with GitHub App token restored"
     }
   ]
-} 
+}
