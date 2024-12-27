@@ -1,0 +1,28 @@
+---
+layout: default
+---
+
+<h1>{{ page.title }}</h1>
+
+<div class="release-info">
+  <p><strong>Tag:</strong> {{ page.tag }}</p>
+  <p><strong>Release Date:</strong> {{ page.release_date | date: "%Y-%m-%d %H:%M:%S" }}</p>
+  <p><strong>Approval Date:</strong> {{ page.approval_date | date: "%Y-%m-%d %H:%M:%S" }}</p>
+  <p><strong>Approved By:</strong> {{ page.approvers }}</p>
+</div>
+
+<div class="release-notes">
+  <h2>Release Notes</h2>
+  {{ content }}
+</div>
+
+<div class="approval-time">
+  <h2>Approval Time</h2>
+  {% assign release_time = page.release_date | date: '%s' | plus: 0 %}
+  {% assign approval_time = page.approval_date | date: '%s' | plus: 0 %}
+  {% assign time_diff = approval_time | minus: release_time %}
+  {% assign minutes = time_diff | divided_by: 60 %}
+  <p>This release took <strong>{{ minutes }} minutes</strong> to be approved.</p>
+</div>
+
+<p><a href="{{ site.baseurl }}/">← Back to Release History</a></p> 

@@ -1,10 +1,18 @@
 title: Release History
-description: History of all approved releases
+description: History of all approved releases with approval times
 theme: jekyll-theme-minimal
+
+collections:
+  releases:
+    output: true
+    permalink: /releases/:name
 
 defaults:
   - scope:
-      path: "releases"
-      type: "pages"
+      path: ""
+      type: "releases"
     values:
-      layout: "default" 
+      layout: "release"
+
+plugins:
+  - jekyll-github-pages 
