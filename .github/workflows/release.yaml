@@ -45,8 +45,9 @@ jobs:
           
       - name: Update releases.json
         run: |
-          if [ ! -f releases.json ]; then
-            echo '{"releases":[]}' > releases.json
+          mkdir -p _data
+          if [ ! -f _data/releases.json ]; then
+            echo '{"releases":[]}' > _data/releases.json
           fi
           
           jq --arg tag "${{ steps.release.outputs.tag }}" \
@@ -58,13 +59,13 @@ jobs:
                "tag": $tag,
                "release_date": $date,
                "notes": $notes
-             }]' releases.json > temp.json && mv temp.json releases.json
+             }]' _data/releases.json > temp.json && mv temp.json _data/releases.json
           
       - name: Create Pull Request
         env:
           GH_TOKEN: ${{ steps.generate_token.outputs.token }}
         run: |
-          git add releases.json
+          git add _data/releases.json
           git commit -m "Release Approval: ${{ steps.release.outputs.tag }}"
           git push -u origin release-approval-${{ steps.release.outputs.tag }}
           
@@ -111,13 +112,13 @@ jobs:
                    "approval_time_minutes": $minutes
                  }
                else . end
-             )' releases.json > temp.json && mv temp.json releases.json
+             )' _data/releases.json > temp.json && mv temp.json _data/releases.json
           
       - name: Commit and push changes
         run: |
           git config --global user.name "Release Approval App"
           git config --global user.email "release-approval[bot]@users.noreply.github.com"
-          git add releases.json
+          git add _data/releases.json
           git commit -m "Update release status: ${{ steps.release.outputs.tag }}"
           git push
 
