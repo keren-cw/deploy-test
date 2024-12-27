@@ -65,7 +65,10 @@
       "title": "Release v1.0.44",
       "tag": "v1.0.44",
       "release_date": "2024-12-27T21:17:13Z",
-      "notes": "Testing release status update after approval"
+      "notes": "Testing release status update after approval",
+      "approval_date": "2024-12-27T21:18:38Z",
+      "approvers": "qe-release-approval[bot]",
+      "approval_time_minutes": 1
     }
   ]
 }
