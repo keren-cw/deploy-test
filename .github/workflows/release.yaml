@@ -112,6 +112,11 @@ jobs:
           app_id: ${{ secrets.APP_ID }}
           private_key: ${{ secrets.APP_PRIVATE_KEY }}
 
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          token: ${{ steps.generate_token.outputs.token }}
+
       - name: Get release from tag
         id: get_release
         uses: actions/github-script@v6
@@ -134,6 +139,19 @@ jobs:
             }
             
             core.setOutput('release_id', release.id);
+            core.setOutput('tag_name', tagName);
+
+      - name: Update release details file
+        run: |
+          git config --global user.name "Release Approval Bot[bot]"
+          git config --global user.email "release-approval-bot[bot]@users.noreply.github.com"
+          
+          # Add merge timestamp to the file
+          echo -e "\n## Approval Details\n- **Merged At**: ${{ github.event.pull_request.merged_at }}" >> releases/${{ steps.get_release.outputs.tag_name }}.md
+          
+          git add releases/${{ steps.get_release.outputs.tag_name }}.md
+          git commit -m "docs: update release details with merge timestamp"
+          git push origin main
 
       - name: Promote to production release
         if: success()
