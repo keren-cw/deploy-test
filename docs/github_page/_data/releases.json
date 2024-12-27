@@ -87,6 +87,12 @@
       "approval_date": "2024-12-27T18:39:50Z",
       "approvers": "qe-release-approval[bot]",
       "approval_time_minutes": 1
+    },
+    {
+      "title": "Release v1.0.47",
+      "tag": "v1.0.47",
+      "release_date": "2024-12-27T18:41:09Z",
+      "notes": "Testing PR approvers collection"
     }
   ]
 }
