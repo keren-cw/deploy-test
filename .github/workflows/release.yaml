@@ -63,17 +63,17 @@ jobs:
           echo "Release Date: ${{ steps.release.outputs.date }}"
           
           # Create new release entry
-          NEW_RELEASE=$(cat << EOF
-          {
-            "title": "Release ${{ steps.release.outputs.tag }}",
-            "tag": "${{ steps.release.outputs.tag }}",
-            "release_date": "${{ steps.release.outputs.date }}"
-          }
-          EOF
-          )
-          
-          # Add new release to releases.json
-          echo "$NEW_RELEASE" | jq --argjson new . '.releases += [$new]' docs/github_page/_data/releases.json > temp.json && mv temp.json docs/github_page/_data/releases.json
+          jq --arg tag "${{ steps.release.outputs.tag }}" \
+             --arg date "${{ steps.release.outputs.date }}" \
+             --arg title "Release ${{ steps.release.outputs.tag }}" \
+             --arg notes "${{ github.event.release.body }}" \
+             '.releases += [{
+               "title": $title,
+               "tag": $tag,
+               "release_date": $date,
+               "notes": $notes
+             }]' docs/github_page/_data/releases.json > docs/github_page/_data/temp.json && \
+          mv docs/github_page/_data/temp.json docs/github_page/_data/releases.json
           
           # Verify final JSON
           echo "Final releases.json content:"
