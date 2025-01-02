@@ -50,20 +50,11 @@ jobs:
           
       - name: Update releases.json
         run: |
-          # Ensure directory exists
           mkdir -p docs/github_page/_data
-          cd docs/github_page/_data
-          
-          # Initialize releases.json if it doesn't exist
-          if [ ! -f releases.json ]; then
-            echo '{"releases":[]}' > releases.json
+          if [ ! -f docs/github_page/_data/releases.json ]; then
+            echo '{"releases":[]}' > docs/github_page/_data/releases.json
           fi
           
-          # Debug output
-          echo "Release Tag: ${{ steps.release.outputs.tag }}"
-          echo "Release Date: ${{ steps.release.outputs.date }}"
-          
-          # Create new release entry
           jq --arg tag "${{ steps.release.outputs.tag }}" \
              --arg date "${{ steps.release.outputs.date }}" \
              --arg title "Release ${{ steps.release.outputs.tag }}" \
@@ -73,12 +64,7 @@ jobs:
                "tag": $tag,
                "release_date": $date,
                "notes": $notes
-             }]' releases.json > temp.json && mv temp.json releases.json
-          
-          # Verify final JSON
-          echo "Final releases.json content:"
-          cat releases.json
-          cd ../../..
+             }]' docs/github_page/_data/releases.json > temp.json && mv temp.json docs/github_page/_data/releases.json
           
       - name: Create Pull Request
         env:
@@ -88,9 +74,7 @@ jobs:
 
             Release Link: https://github.com/${{ github.repository }}/releases/tag/${{ steps.release.outputs.tag }}
         run: |
-          cd docs/github_page/_data
-          git add releases.json
-          cd ../../..
+          git add docs/github_page/_data/releases.json
           git -c user.name="${{ env.APP_NAME }}" -c user.email="${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com" commit -m "Release Approval: ${{ steps.release.outputs.tag }}"
           git push -u origin approval-${{ steps.release.outputs.tag }}
           
@@ -139,7 +123,6 @@ jobs:
           
       - name: Update releases.json
         run: |
-          cd docs/github_page/_data
           jq --arg tag "${{ steps.release.outputs.tag }}" \
              --arg date "${{ steps.release.outputs.approval_date }}" \
              --arg approvers "${{ steps.approvers.outputs.list }}" \
@@ -152,8 +135,7 @@ jobs:
                    "approval_time_minutes": $minutes
                  }
                else . end
-             )' releases.json > temp.json && mv temp.json releases.json
-          cd ../../..
+             )' docs/github_page/_data/releases.json > temp.json && mv temp.json docs/github_page/_data/releases.json
           
       - name: Update release status
         env:
@@ -163,9 +145,7 @@ jobs:
           
       - name: Commit and push changes
         run: |
-          cd docs/github_page/_data
-          git add releases.json
-          cd ../../..
+          git add docs/github_page/_data/releases.json
           git commit -m "Update release status: ${{ steps.release.outputs.tag }}"
           git push
 
