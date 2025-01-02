@@ -5,6 +5,12 @@
       "title": "Example Release",
       "tag": "v1.0.0",
       "release_date": "2024-01-02T18:00:00Z"
+    },
+    {
+      "title": "Release v1.0.56",
+      "tag": "v1.0.56",
+      "release_date": "2025-01-02T16:35:15Z",
+      "notes": "Testing workflow after reverting to v1.0.50"
     }
   ]
 }
